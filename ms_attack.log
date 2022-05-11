@@ -1,0 +1,54 @@
+Downloading http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz to dataset/MNIST/raw/train-images-idx3-ubyte.gz
+Extracting dataset/MNIST/raw/train-images-idx3-ubyte.gz
+Downloading http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz to dataset/MNIST/raw/train-labels-idx1-ubyte.gz
+Extracting dataset/MNIST/raw/train-labels-idx1-ubyte.gz
+Downloading http://yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz to dataset/MNIST/raw/t10k-images-idx3-ubyte.gz
+Extracting dataset/MNIST/raw/t10k-images-idx3-ubyte.gz
+Downloading http://yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz to dataset/MNIST/raw/t10k-labels-idx1-ubyte.gz
+Extracting dataset/MNIST/raw/t10k-labels-idx1-ubyte.gz
+Processing...
+Done!
+Loading 'defense' is done.
+Loading 'attack' is done.
+Accuracy of netS: 13.18 %
+Accuracy of netV: 99.55 %
+Starting training net S using real samples to query.
+epoch: 1/5
+batch idx: 0 loss_s: 2.2983408
+batch idx: 200 loss_s: 0.25064096
+batch idx: 400 loss_s: 0.15357214
+batch idx: 600 loss_s: 0.35873282
+batch idx: 800 loss_s: 0.32321715
+batch idx: 1000 loss_s: 0.10722027
+epoch: 2/5
+batch idx: 0 loss_s: 0.16076744
+batch idx: 200 loss_s: 0.14888242
+batch idx: 400 loss_s: 0.10461742
+batch idx: 600 loss_s: 0.083883926
+batch idx: 800 loss_s: 0.08754899
+batch idx: 1000 loss_s: 0.15760955
+epoch: 3/5
+batch idx: 0 loss_s: 0.0773225
+batch idx: 200 loss_s: 0.069405176
+batch idx: 400 loss_s: 0.050691232
+batch idx: 600 loss_s: 0.11522269
+batch idx: 800 loss_s: 0.04844593
+batch idx: 1000 loss_s: 0.027192688
+epoch: 4/5
+batch idx: 0 loss_s: 0.077401206
+batch idx: 200 loss_s: 0.038052727
+batch idx: 400 loss_s: 0.046793696
+batch idx: 600 loss_s: 0.014889946
+batch idx: 800 loss_s: 0.020856192
+batch idx: 1000 loss_s: 0.104520775
+epoch: 5/5
+batch idx: 0 loss_s: 0.022675559
+batch idx: 200 loss_s: 0.02114547
+batch idx: 400 loss_s: 0.021858213
+batch idx: 600 loss_s: 0.040186998
+batch idx: 800 loss_s: 0.00517713
+batch idx: 1000 loss_s: 0.033614937
+Finished training of netS
+Accuracy of netS: 98.84 %
+Accuracy of netV: 99.55 %
+Attack success rate of 'FGSM': 73.96 %
