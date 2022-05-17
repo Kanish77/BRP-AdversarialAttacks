@@ -8,6 +8,7 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset
 from torchvision import datasets, transforms
 from torch.utils.data import WeightedRandomSampler
+from MyDataset import CustomDataset
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -34,7 +35,7 @@ class ConvNet(nn.Module):
 
     def perform_training(self, train_loader, num_epochs, learning_rate):
         criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.SGD(self.parameters(), lr=learning_rate)
+        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
         n_total_steps = len(train_loader)
         for epoch in range(num_epochs):
             for i, (images, labels, index) in enumerate(train_loader):
@@ -98,6 +99,20 @@ class ConvNet(nn.Module):
         #             bool_arr.append(i.item())
         #     return torch.tensor(bool_arr)
 
+    """
+    Return 1d numpy array of predictions. Where each entry in the array corresponds to the prediction for test image
+    """
+    def predict_test_set(self, test_dataset):
+        self.eval()
+        with torch.no_grad():
+            predictions = []
+            for image, label, idx in test_dataset:
+                image = image.to(device)
+                output = self(image)
+                pred = output.argmax(dim=1, keepdim=True).item()
+                predictions.append(pred)
+            return predictions
+
     def return_accuracy(self, data_loader):
         print_once = True
 
@@ -153,22 +168,6 @@ class ConvNet(nn.Module):
             for i in range(10):
                 acc = 100.0 * n_class_correct[i] / n_class_samples[i]
                 print(f'Accuracy of {classes[i]}: {acc} %')
-
-
-class CustomCifar(Dataset):
-    def __init__(self, transform_to_apply, train=True, root="./data"):
-        self.cifar10 = datasets.CIFAR10(root=root,
-                                        download=False,
-                                        train=train,
-                                        transform=transform_to_apply)
-
-    def __getitem__(self, index):
-        data, target = self.cifar10[index]
-
-        return data, target, index
-
-    def __len__(self):
-        return len(self.cifar10)
 
 # # Hyper-parameters
 # batch_size = 4
@@ -228,3 +227,19 @@ class CustomCifar(Dataset):
 # # print("performance of bad model")
 # # arr[1].evaluate_performance(test_loader)
 #
+# transform = transforms.Compose(
+#     [transforms.ToTensor(),
+#      transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+# train_dataset = CustomDataset("CIFAR10", transform, True)
+# test_dataset = CustomDataset("CIFAR10", transform, False)
+# train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
+#                                            batch_size=4,
+#                                            shuffle=True)
+#
+# test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
+#                                           batch_size=4,
+#                                           shuffle=False)
+# cnn = ConvNet().to(device)
+# cnn.perform_training(train_loader, 2, 0.001)
+# cnn.return_accuracy(test_loader)
+

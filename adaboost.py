@@ -168,9 +168,9 @@ class AdaBoost(object):
             incorrect = y_pred != y
 
             if print_once:
-                print("y_original", y)
-                print("y_pred", y_pred)
-                print("incorrect", incorrect)
+                #print("y_original", y)
+                #print("y_pred", y_pred)
+                #print("incorrect", incorrect)
                 print_once = False
 
             # learner_err = sum([w[i] * self.I(y[i] != Gm(X_sample[i].reshape(1, -1))) for i in range(N)]) / sum(w)
@@ -218,16 +218,30 @@ class AdaBoost(object):
         ...
 
     def predict(self, X):
+        print_once = True
         n_classes = self._num_classes
         classes = self._classes[:, np.newaxis]
         pred = sum((estimator.predict(X) == classes).T * w
                    for estimator, w in zip(self._learner_array, self._learner_weights))
-
         pred /= self._learner_weights.sum()
+
         if n_classes == 2:
             pred[:, 0] *= -1
             pred = pred.sum(axis=1)
             return self._classes.take(pred > 0, axis=0)
+
+        if print_once:
+            estimator = self._learner_array[0]
+            print("n_classes: ", n_classes)
+            print("classes with odd np shite", classes)
+            print("classes normal", self._classes)
+            print("pred normalised", pred)
+            res = self._classes.take(np.argmax(pred, axis=1), axis=0)
+            print("final result", res)
+            print("estimator.predict(X)", estimator.predict(X))
+            res2 = estimator.predict(X) == classes
+            print("estimator.predict(X)==classes", res2)
+            print("but now with T", res2.T)
 
         return self._classes.take(np.argmax(pred, axis=1), axis=0)
 
@@ -241,18 +255,20 @@ data = digits.images.reshape((n_samples, -1))
 # Split data into 50% train and 50% test subsets
 X_train, X_test, y_train, y_test = train_test_split(data, digits.target, test_size=0.8, shuffle=False)
 
-adaboost = AdaBoost(m=50, X=X_train, y=y_train)
+adaboost = AdaBoost(m=5, X=X_train, y=y_train)
 adaboost.fit_ensemble()
 y_pred_orig = adaboost.predict(X_test)
 print("Performance:", 100 * sum(y_pred_orig == y_test) / len(y_test))
 print("Confusion Matrix:", "\n", CM(y_test, y_pred_orig))
 
-clf = AdaBoostClassifier(n_estimators=100, algorithm="SAMME")
-clf.fit(X_train, y_train)
-y_pred2 = clf.predict(X_test)
-print("Performance:", 100 * sum(y_pred2 == y_test) / len(y_test))
-print("Confusion Matrix:\n", CM(y_test, y_pred2))
 
+
+
+# clf = AdaBoostClassifier(n_estimators=100, algorithm="SAMME")
+# clf.fit(X_train, y_train)
+# y_pred2 = clf.predict(X_test)
+# print("Performance:", 100 * sum(y_pred2 == y_test) / len(y_test))
+# print("Confusion Matrix:\n", CM(y_test, y_pred2))
 
 # Code from https://github.com/Samarendra109/ML-Models/blob/master/ensemble/AdaBoostClassifier.py
 # def indexToVector(y, k, labelDict):

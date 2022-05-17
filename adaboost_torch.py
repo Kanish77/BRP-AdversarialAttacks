@@ -6,7 +6,10 @@ from sklearn.metrics import confusion_matrix as CM
 from torch.utils.data import WeightedRandomSampler
 from torchvision import datasets, transforms
 from torch.utils.data import Dataset, DataLoader
-from CNN import ConvNet, CustomCifar
+from CNN import ConvNet
+from MLP import MLP
+
+from MyDataset import CustomDataset
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -35,9 +38,9 @@ class AdaBoost(object):
         # Making an array for the learners (these can be pytorch CNN objects or whatever machine learning classifier)
         self._learner_array = []
         # An array that stores the "amount of say" of each learner i.e its weight in the final prediction
-        self._learner_weights = torch.zeros(self._number_learners)
+        self._learner_weights = np.zeros(self._number_learners)
         # An array that stores the error of each learner
-        self._learner_errors = torch.ones(self._number_learners)
+        self._learner_errors = np.ones(self._number_learners)
 
         # Data related to training data
         self._original_X = X
@@ -143,7 +146,7 @@ class AdaBoost(object):
 
         for m in range(self._number_learners):
             # Sample data based on weight distribution (we don't if m == 0 i.e. we are training the first learner)
-            if m > 1:
+            if m >= 1:
                 train_loader = self.draw_random_sample(self._training_data, w, self._nn_batch_size)
             else:
                 train_loader = torch.utils.data.DataLoader(self._training_data, batch_size=self._nn_batch_size,
@@ -154,7 +157,7 @@ class AdaBoost(object):
             # TODO, when i make this non-hardcoded, i need to add randomness with seeds for the base classifier
             # TODO / for example, see scikit impl or Adaboost-CNN code
             print("STARTED TRAINING LEARNER", m)
-            weak_learner = ConvNet().to(device)
+            weak_learner = MLP(784, 10, 10).to(device)
             weak_learner = weak_learner.perform_training(train_loader, self._nn_num_epoch, self._nn_learning_rate)
             print("FINISHED TRAINING LEARNER", m)
             # Compute error of this weak learner
@@ -188,18 +191,9 @@ class AdaBoost(object):
             w = self.update_weights_new(train_loader, incorrect, alphaM, w, self._nn_batch_size)
             print("DONE UPDATING")
             self._learner_array.append(weak_learner)
-            # self._learner_errors[m] = learner_err
-            # self._learner_weights[m] = alphaM
-
-    def make_prediction(self, X):
-        y = 0
-        for m in range(self._number_learners):
-            Gm = self._learner_array[m]
-            AlphaM = self._learner_weights[m]
-            y += AlphaM * Gm.predict(X)
-        signA = np.vectorize(self.sign)
-        y = np.where(signA(y) == -1, -1, 1)
-        return y
+            self._learner_errors[m] = learner_err
+            self._learner_weights[m] = alphaM
+        return self._learner_errors, self._learner_weights
 
     def return_some_attribute(self):
         ...
@@ -207,28 +201,37 @@ class AdaBoost(object):
     def perform_experiments(self):
         ...
 
-    def predict(self, X):
-        n_classes = self._num_classes
-        classes = self._classes[:, np.newaxis]
-        pred = sum((estimator.predict(X) == classes).T * w
-                   for estimator, w in zip(self._learner_array, self._learner_weights))
-
+    def ensembled_prediction(self, test_dataset):
+        n_classes = 10
+        classes_normal = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        classes = classes_normal[:, np.newaxis]
+        pred = sum((learner.predict_test_set(test_dataset) == classes).T * alpha
+                   for learner, alpha in zip(self._learner_array, self._learner_weights))
         pred /= self._learner_weights.sum()
-        if n_classes == 2:
-            pred[:, 0] *= -1
-            pred = pred.sum(axis=1)
-            return self._classes.take(pred > 0, axis=0)
 
-        return self._classes.take(np.argmax(pred, axis=1), axis=0)
+        final_predictions = classes_normal.take(np.argmax(pred, axis=1), axis=0)
 
-
+        y_real = np.array([label for data, label, idx in test_dataset])
+        print("Performance:", 100 * sum(y_real == final_predictions) / len(y_real))
+        #print("Confusion Matrix:", "\n", CM(y_real, final_predictions))
+        return final_predictions
 
 
 # Trying out adaboost for CNN
-batch_size = 4
-transform = transforms.Compose(
-    [transforms.ToTensor(),
-     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-cifar10_train = CustomCifar(transform_to_apply=transform, train=True)
-adaboost_cnn = AdaBoost(2, [], [], cifar10_train, None, 1, 4, 0.001)
-adaboost_cnn.fit_ensemble()
+# transform = transforms.Compose(
+#     [transforms.ToTensor(),
+#      transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+# cifar10_train = CustomDataset(dataset_name="CIFAR10", transform_to_apply=transform, train=True)
+# adaboost_cnn = AdaBoost(2, [], [], cifar10_train, None, 1, 4, 0.001)
+# adaboost_cnn.fit_ensemble()
+
+# Trying out adaboost for mnist (mlp)
+mnist_train = CustomDataset(dataset_name="MNIST", transform_to_apply=transforms.ToTensor(), train=True)
+mnist_test = CustomDataset(dataset_name="MNIST", transform_to_apply=transforms.ToTensor(), train=False)
+
+adaboost_mlp = AdaBoost(3, [], [], mnist_train, None, 5, 100, 0.001)
+learner_err, learner_weight = adaboost_mlp.fit_ensemble()
+print("learner errors", learner_err)
+print("learner weights", learner_weight)
+adaboost_mlp.ensembled_prediction(mnist_test)
+

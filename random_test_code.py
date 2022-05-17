@@ -10,24 +10,24 @@ import numpy as np
 from torch.utils.data import WeightedRandomSampler
 from torchvision import datasets, transforms
 from torch.utils.data import Dataset, DataLoader
-
 import matplotlib.pyplot as plt
 
 
-class MyDataset(Dataset):
-    def __init__(self, transform):
-        self.cifar10 = datasets.CIFAR10(root='./data',
-                                        download=False,
-                                        train=True,
-                                        transform=transform)
+class CustomDataset(Dataset):
+    def __init__(self, dataset_name, transform_to_apply, train=True, root="./data"):
+        if dataset_name == "CIFAR10":
+            self.data = datasets.CIFAR10(root=root, download=True, train=train, transform=transform_to_apply)
+        if dataset_name == "MNIST":
+            self.data = datasets.MNIST(root=root, download=True, train=train, transform=transform_to_apply)
+        if dataset_name == "FASHION-MNIST":
+            self.data = datasets.FashionMNIST(root=root, download=True, train=train, transform=transform_to_apply)
 
     def __getitem__(self, index):
-        data, target = self.cifar10[index]
-
+        data, target = self.data[index]
         return data, target, index
 
     def __len__(self):
-        return len(self.cifar10)
+        return len(self.data)
 
 
 #
@@ -56,8 +56,28 @@ class MyDataset(Dataset):
 # plt.hist(indices_2, bins=1000)
 # plt.show()
 
-w = np.array([1, 2, 3, 4])
-y = np.array([True, False, True, False])
-learner_err = np.dot(y, w) / np.sum(w)
 
-print(w * y)
+data = CustomDataset(dataset_name="CIFAR10", transform_to_apply=transforms.ToTensor(), train=False)
+print_once = True
+for x, y, idx in data:
+    # x is a tensor, y is an int (the class) (between 0 - 9), idx = index of the training variable
+    if print_once:
+        print(x)
+        print(y)
+        print(idx)
+        print_once = False
+    else:
+        break
+
+temp = np.array([[0], [1]]) == np.array([0, 1, 0])
+print(temp)
+print(temp.T)
+
+temp2 = np.array([0, 1, 0]) == np.array([[0], [1]])
+print(temp2)
+print(temp2.T * 0.4)
+
+for i in range(10):
+    if i == 7:
+        i = i - 1
+    print(i)
