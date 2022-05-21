@@ -9,40 +9,64 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import datasets, transforms
 from torch.utils.data import WeightedRandomSampler
 from MyDataset import CustomDataset
+from base_learner import BaseLearner
 
 # Device configuration
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-class ConvNet(nn.Module):
-    def __init__(self):
+class ConvNet(nn.Module, BaseLearner):
+    def __init__(self, device):
         super(ConvNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16 * 5 * 5, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 10)
+        self.conv0 = nn.Conv2d(3, 20, 5, 1)
+        self.conv1 = nn.Conv2d(20, 20, 5, 1)
+        self.conv2 = nn.Conv2d(20, 50, 5, 1)
+        self.fc1 = nn.Linear(4*4*50, 500)
+        self.fc2 = nn.Linear(500, 10)
+        self.device = device
 
     def forward(self, x):
-        # -> n, 3, 32, 32
-        x = self.pool(F.relu(self.conv1(x)))  # -> n, 6, 14, 14
-        x = self.pool(F.relu(self.conv2(x)))  # -> n, 16, 5, 5
-        x = x.view(-1, 16 * 5 * 5)  # -> n, 400
-        x = F.relu(self.fc1(x))  # -> n, 120
-        x = F.relu(self.fc2(x))  # -> n, 84
-        x = self.fc3(x)  # -> n, 10
+        x = F.relu(self.conv0(x))
+        x = F.relu(self.conv1(x))
+        x = F.max_pool2d(x, 2, 2)
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, 2, 2)
+        x = x.view(-1, 4*4*50)
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
         return x
 
+    # def __init__(self, device):
+    #     super(ConvNet, self).__init__()
+    #     self.conv1 = nn.Conv2d(3, 6, 5)
+    #     self.pool = nn.MaxPool2d(2, 2)
+    #     self.conv2 = nn.Conv2d(6, 16, 5)
+    #     self.fc1 = nn.Linear(16 * 5 * 5, 120)
+    #     self.fc2 = nn.Linear(120, 84)
+    #     self.fc3 = nn.Linear(84, 10)
+    #     self.device = device
+    #
+    # def forward(self, x):
+    #     # -> n, 3, 32, 32
+    #     x = self.pool(F.relu(self.conv1(x)))  # -> n, 6, 14, 14
+    #     x = self.pool(F.relu(self.conv2(x)))  # -> n, 16, 5, 5
+    #     x = x.view(-1, 16 * 5 * 5)  # -> n, 400
+    #     x = F.relu(self.fc1(x))  # -> n, 120
+    #     x = F.relu(self.fc2(x))  # -> n, 84
+    #     x = self.fc3(x)  # -> n, 10
+    #     return x
+
     def perform_training(self, train_loader, num_epochs, learning_rate):
-        criterion = nn.CrossEntropyLoss()
+        self.train()
+        criterion = nn.CrossEntropyLoss(reduction="mean")
         optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
         n_total_steps = len(train_loader)
+        print("hi there")
+        print(len(train_loader))
         for epoch in range(num_epochs):
             for i, (images, labels, index) in enumerate(train_loader):
                 # origin shape: [4, 3, 32, 32] = 4, 3, 1024
                 # input_layer: 3 input channels, 6 output channels, 5 kernel size
-                images = images.to(device)
-                labels = labels.to(device)
+                images = images.to(self.device)
+                labels = labels.to(self.device)
 
                 # Forward pass
                 outputs = self(images)
@@ -53,7 +77,7 @@ class ConvNet(nn.Module):
                 loss.backward()
                 optimizer.step()
 
-                if (i + 1) % 2000 == 0:
+                if (i + 1) % 100 == 0:
                     print(f'Epoch [{epoch + 1}/{num_epochs}], Step [{i + 1}/{n_total_steps}], Loss: {loss.item():.4f}')
         # Save the model
         # PATH = './cnn.pth'
@@ -63,15 +87,17 @@ class ConvNet(nn.Module):
     """
     
     """
+
     def compute_incorrect_array(self, train_loader):
+        self.eval()
         with torch.no_grad():
             n_correct = 0
             n_samples = 0
             do_once = True
             for (images, labels, idx) in train_loader:
-                images = images.to(device)
-                labels = labels.to(device)
-                outputs = self(images) # result of doing forward pass on these inputs
+                images = images.to(self.device)
+                labels = labels.to(self.device)
+                outputs = self(images)  # result of doing forward pass on these inputs
                 # max returns (value, index)
                 _, predicted = torch.max(outputs, 1)
                 n_samples += labels.size(0)
@@ -102,12 +128,13 @@ class ConvNet(nn.Module):
     """
     Return 1d numpy array of predictions. Where each entry in the array corresponds to the prediction for test image
     """
+
     def predict_test_set(self, test_dataset):
         self.eval()
         with torch.no_grad():
             predictions = []
             for image, label, idx in test_dataset:
-                image = image.to(device)
+                image = image.to(self.device)
                 output = self(image)
                 pred = output.argmax(dim=1, keepdim=True).item()
                 predictions.append(pred)
@@ -121,9 +148,9 @@ class ConvNet(nn.Module):
             n_samples = 0
 
             for (images, labels, idx) in data_loader:
-                images = images.to(device)
-                labels = labels.to(device)
-                outputs = self(images) # result of doing forward pass on these inputs
+                images = images.to(self.device)
+                labels = labels.to(self.device)
+                outputs = self(images)  # result of doing forward pass on these inputs
                 # max returns (value , index), where value is the maximum value in the array along the given dimension
                 _, predicted = torch.max(outputs, 1)
                 n_samples += labels.size(0)
@@ -147,8 +174,8 @@ class ConvNet(nn.Module):
             n_class_correct = [0 for i in range(10)]
             n_class_samples = [0 for i in range(10)]
             for (images, labels, idx) in test_loader:
-                images = images.to(device)
-                labels = labels.to(device)
+                images = images.to(self.device)
+                labels = labels.to(self.device)
                 outputs = self(images)
                 # max returns (value ,index)
                 _, predicted = torch.max(outputs, 1)
@@ -242,4 +269,3 @@ class ConvNet(nn.Module):
 # cnn = ConvNet().to(device)
 # cnn.perform_training(train_loader, 2, 0.001)
 # cnn.return_accuracy(test_loader)
-

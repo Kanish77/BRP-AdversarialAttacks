@@ -77,7 +77,14 @@ temp2 = np.array([0, 1, 0]) == np.array([[0], [1]])
 print(temp2)
 print(temp2.T * 0.4)
 
-for i in range(10):
-    if i == 7:
-        i = i - 1
-    print(i)
+
+mnist_test = CustomDataset(dataset_name="MNIST", transform_to_apply=transforms.ToTensor(), train=False)
+loader = torch.utils.data.DataLoader(mnist_test, batch_size=1, shuffle=True)
+
+iter = iter(loader)
+img, y, idx = iter.next()
+print(img.shape)
+img = img.reshape(-1, 28 * 28)
+print(img.shape)
+img = img.reshape(28, 28)
+print(img.shape)
