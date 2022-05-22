@@ -47,6 +47,7 @@ class MLP(nn.Module, BaseLearner):
                 # origin shape: [100, 1, 28, 28], resized: [100, 784]
                 images = images.reshape(-1, 28 * 28).to(self.device)
                 labels = labels.to(self.device)
+                index = index.to(self.device)
 
                 # If we are performing adversarial_training, then we need to perturb the input image
                 if adversarial_training:
@@ -66,7 +67,7 @@ class MLP(nn.Module, BaseLearner):
                 weighted_ce_loss.backward()
                 optimizer.step()
 
-                if (i + 1) % 100 == 0:
+                if (i + 1) % 1500 == 0:
                     print(f'Epoch [{epoch + 1}/{num_epochs}], Step [{i + 1}/{n_total_steps}], '
                           f'C-loss: {weighted_ce_loss.item():.4f}')
         # Save the model

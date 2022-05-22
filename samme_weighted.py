@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torchvision
 from advertorch.context import ctx_noparamgrad_and_eval
-from sklearn.metrics import confusion_matrix as CM
 import matplotlib.pyplot as plt
 from torch.utils.data import WeightedRandomSampler
 from torchvision import datasets, transforms
@@ -160,7 +159,7 @@ class AdaBoost(object):
 
             # Update data distribution
             print("UPDATING WEIGHTS")
-            w = self.update_weights(train_loader, incorrect, alphaM, w, self._nn_batch_size)
+            w = self.update_weights(train_loader, incorrect, alphaM, w, self._nn_batch_size).to(device)
             print("DONE UPDATING")
             self._learner_array.append(weak_learner)
             self._learner_errors[m] = learner_err
@@ -202,19 +201,19 @@ class AdaBoost(object):
         # For each image in the test dataset, we want to generate a perturbed image
 
         for image, true_label, idx in test_dataset:
-            image = image.reshape(-1, 28 * 28)
+            image = image.reshape(-1, 28 * 28).to(device)
             with ctx_noparamgrad_and_eval(target_model):
-                perturbed_img = adversary_method.perturb(image, torch.tensor([true_label]))
+                perturbed_img = adversary_method.perturb(image, torch.tensor([true_label]).to(device))
             perturbed_images.append((perturbed_img, true_label, idx))
 
         final_predictions = self.ensembled_prediction(perturbed_images, True)
 
-        for i in range(3):
-            plt.subplot(2, 3, i + 1)
-            img = perturbed_images[i][0].reshape(28, 28)
-            plt.imshow(img, cmap='gray')
-            plt.title("perturbation images")
-        plt.show()
+        # for i in range(3):
+        #     plt.subplot(2, 3, i + 1)
+        #     img = perturbed_images[i][0].reshape(28, 28)
+        #     plt.imshow(img, cmap='gray')
+        #     plt.title("perturbation images")
+        # plt.show()
         return final_predictions
 
 
@@ -234,15 +233,15 @@ class AdaBoost(object):
 mnist_train = CustomDataset(dataset_name="MNIST", transform_to_apply=transforms.ToTensor(), train=True)
 mnist_test = CustomDataset(dataset_name="MNIST", transform_to_apply=transforms.ToTensor(), train=False)
 
-adaboost_mlp = AdaBoost(5, [], [], mnist_train, None, 5, 100, 0.001)
+adaboost_mlp = AdaBoost(15, [], [], mnist_train, None, 25, 20, 0.002)
 learner_error, learner_weight, target = adaboost_mlp.fit_ensemble(adversarial_training=True)
 print("learner errors", learner_error)
 print("learner weights", learner_weight)
 adaboost_mlp.ensembled_prediction(mnist_test)
 adaboost_mlp.test_adversary_robustness(mnist_test, "FGSM", target)
 
-for i in range(3):
-    plt.subplot(2, 3, i + 1)
-    plt.imshow(mnist_test[i][0][0], cmap='gray')
-    plt.title("real images")
-plt.show()
+# for i in range(3):
+#     plt.subplot(2, 3, i + 1)
+#     plt.imshow(mnist_test[i][0][0], cmap='gray')
+#     plt.title("real images")
+# plt.show()

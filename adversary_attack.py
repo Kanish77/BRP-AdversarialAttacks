@@ -22,7 +22,7 @@ class AdversaryCode(object):
     def get_adversary_method(self, attack_name):
         if attack_name == "FGSM":
             adversary = GradientSignAttack(
-                self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="mean"), eps=0.024, targeted=False)
+                self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="mean"), eps=0.25, targeted=False)
         elif attack_name == "BIM":
             adversary = LinfBasicIterativeAttack(
                 self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="sum"), eps=0.25,
