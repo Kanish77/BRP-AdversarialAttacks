@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torchvision
+from advertorch.attacks import PGDAttack, GradientSignAttack
 from advertorch.context import ctx_noparamgrad_and_eval
 import matplotlib.pyplot as plt
 from torch.utils.data import WeightedRandomSampler
@@ -146,7 +147,7 @@ class AdaBoost(object):
             if learner_err >= 1 - 1 / num_classes:
                 # TODO add for this
                 print("EYY YOO big problem, for learner", m)
-                break
+                #break
 
             # Stop if we have gotten 0% error (i.e. 1e-10)
             if learner_err <= EPSILON:
@@ -158,7 +159,7 @@ class AdaBoost(object):
 
             if alphaM <= 0:
                 print("EYY Yoo, early break, for learner", m)
-                break
+                #break
 
             # Update data distribution
             print("UPDATING WEIGHTS")
@@ -191,8 +192,8 @@ class AdaBoost(object):
         # print("Confusion Matrix:", "\n", CM(y_real, final_predictions))
         return final_predictions
 
-    def test_adversary_robustness(self, test_dataset, adversary_algo, target_model):
-        adversary_method = AdversaryCode("", target_model).get_adversary_method(adversary_algo)
+    def test_adversary_robustness(self, test_dataset, adversary_method, target_model):
+        #adversary_method = AdversaryCode("", target_model).get_adversary_method(adversary_algo)
         perturbed_images = []
 
         # For each image in the test dataset, we want to generate a perturbed image
@@ -231,12 +232,23 @@ class AdaBoost(object):
 mnist_train = CustomDataset(dataset_name="MNIST", transform_to_apply=transforms.ToTensor(), train=True)
 mnist_test = CustomDataset(dataset_name="MNIST", transform_to_apply=transforms.ToTensor(), train=False)
 
-adaboost_mlp = AdaBoost(1, [], [], mnist_train, None, 1, 100, 0.001)
+adaboost_mlp = AdaBoost(7, [], [], mnist_train, None, 3, 100, 0.002)
 learner_error, learner_weight, target = adaboost_mlp.fit_ensemble(adversarial_training=True)
+np.set_printoptions(precision=4)
 print("learner errors", learner_error)
 print("learner weights", learner_weight)
 adaboost_mlp.ensembled_prediction(mnist_test)
-adaboost_mlp.test_adversary_robustness(mnist_test, "FGSM", target)
+
+
+adversary_attack_PGD= PGDAttack(
+                target, loss_fn=nn.CrossEntropyLoss(reduction="mean"),
+                eps=0.156, nb_iter=6, eps_iter=0.03, clip_min=0.0, clip_max=1.0, targeted=False)
+adversary_attack_FGSM = GradientSignAttack(
+    target, loss_fn=nn.CrossEntropyLoss(reduction="mean"), eps=0.156, targeted=False)
+print("pgd attack now")
+adaboost_mlp.test_adversary_robustness(mnist_test, adversary_attack_PGD, target)
+print("fgsm attack now")
+adaboost_mlp.test_adversary_robustness(mnist_test, adversary_attack_FGSM, target)
 
 # for i in range(3):
 #     plt.subplot(2, 3, i + 1)

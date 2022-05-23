@@ -18,9 +18,9 @@ from adversary_attack import AdversaryCode
 class WCNN3(nn.Module):  # 3 layers has structure: 2 conv layers, and 1 fully connected
     def __init__(self):
         super(WCNN3, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=16, kernel_size=5, stride=1)
-        self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=5, stride=1)
-        self.out = nn.Linear(32 * 4 * 4, 10)
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=20, kernel_size=5, stride=1)
+        self.conv2 = nn.Conv2d(in_channels=20, out_channels=50, kernel_size=5, stride=1)
+        self.out = nn.Linear(50 * 4 * 4, 10)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -76,7 +76,7 @@ class CNNBaseLearner(object):
                 weighted_ce_loss.backward()
                 optimizer.step()
 
-                if (i + 1) % 10 == 0:
+                if (i + 1) % 150 == 0:
                     print(f'Epoch [{epoch + 1}/{num_epochs}], Step [{i + 1}/{n_total_steps}], '
                           f'C-loss: {weighted_ce_loss.item():.4f}')
                 if print_once:

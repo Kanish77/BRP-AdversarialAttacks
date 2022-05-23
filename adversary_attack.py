@@ -22,7 +22,7 @@ class AdversaryCode(object):
     def get_adversary_method(self, attack_name):
         if attack_name == "FGSM":
             adversary = GradientSignAttack(
-                self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="mean"), eps=0.25, targeted=False)
+                self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="mean"), eps=0.15, targeted=False)
         elif attack_name == "BIM":
             adversary = LinfBasicIterativeAttack(
                 self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="sum"), eps=0.25,
@@ -33,8 +33,8 @@ class AdversaryCode(object):
                 max_iterations=12, targeted=False)
         elif attack_name == "PGD":
             adversary = PGDAttack(
-                self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="sum"),
-                eps=0.25, nb_iter=6, eps_iter=0.03, clip_min=0.0, clip_max=1.0, targeted=False)
+                self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="mean"),
+                eps=0.078, nb_iter=6, eps_iter=0.03, clip_min=0.0, clip_max=1.0, targeted=False)
         elif attack_name == "Lf-PGD":
             adversary = LinfPGDAttack(
                 self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="sum"), eps=0.15,
