@@ -199,7 +199,7 @@ class AdaBoost(object):
 
         for image, true_label, idx in test_dataset:
             #image = image.reshape(-1, 28 * 28).to(device)
-            image = image.to(device)
+            image = image.reshape(1, 1, 28, 28).to(device)
             with ctx_noparamgrad_and_eval(target_model):
                 perturbed_img = adversary_method.perturb(image, torch.tensor([true_label]).to(device))
             perturbed_images.append((perturbed_img, true_label, idx))

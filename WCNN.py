@@ -150,7 +150,7 @@ class CNNBaseLearner(object):
             predictions = []
             # correct = 0
             for image, label, idx in test_dataset:
-                image = image.to(device)
+                image = image.reshape(1, 1, 28, 28).to(device)
                 output = model(image)
                 pred = output.argmax(dim=1, keepdim=False).item()
                 predictions.append(pred)
