@@ -9,11 +9,11 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import datasets, transforms
 from torch.utils.data import WeightedRandomSampler
 from MyDataset import CustomDataset
-from base_learner import BaseLearner
 
-# Device configuration
+# Structure based on https://github.com/python-engineer/pytorchTutorial/blob/master/14_cnn.py
+# Is made for the CIFAR dataset
 
-class ConvNet(nn.Module, BaseLearner):
+class ConvNet(nn.Module):
     def __init__(self, device):
         super(ConvNet, self).__init__()
         self.conv0 = nn.Conv2d(3, 20, 5, 1)

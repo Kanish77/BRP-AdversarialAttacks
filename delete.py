@@ -63,7 +63,7 @@ if __name__ == '__main__':
         nb_epoch = 90
         model_filename = "mnist_lenet5_advtrained.pt"
     else:
-        raise
+        print("IDFK")
 
     train_loader = get_mnist_train_loader(
         batch_size=args.train_batch_size, shuffle=True)

@@ -7,11 +7,11 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from MyDataset import CustomDataset
-from base_learner import BaseLearner
 from advertorch.context import ctx_noparamgrad_and_eval
 
+# Structure based on https://github.com/python-engineer/pytorchTutorial/blob/master/13_feedforward.py
 
-class MLP(nn.Module, BaseLearner):
+class MLP(nn.Module):
     def __init__(self, input_size, hidden_size, num_classes, device):
         super(MLP, self).__init__()
         self.input_size = input_size
@@ -67,7 +67,7 @@ class MLP(nn.Module, BaseLearner):
                 weighted_ce_loss.backward()
                 optimizer.step()
 
-                if (i + 1) % 1500 == 0:
+                if (i + 1) % 100 == 0:
                     print(f'Epoch [{epoch + 1}/{num_epochs}], Step [{i + 1}/{n_total_steps}], '
                           f'C-loss: {weighted_ce_loss.item():.4f}')
         # Save the model
