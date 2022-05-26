@@ -158,6 +158,25 @@ class CNNBaseLearner(object):
             return np.array(predictions)
 
     @staticmethod
+    def predict_test_set_adversary(model, device, test_dataset, attack_model, adversary_algo):
+        model.eval()
+        predictions = []
+        for image, label, idx in test_dataset:
+            image, label, idx = image.reshape(1, 1, 28, 28).to(device), label.to(device), idx.to(device)
+
+            # perturb image w.r.t attack model parameters using the adversarial generation algorithm
+            with ctx_noparamgrad_and_eval(attack_model):
+                image = adversary_algo.perturb(image, label)
+
+            # get output using this model
+            with torch.no_grad():
+                output = model(image)
+
+            pred = output.argmax(dim=1, keepdim=False).item()
+            predictions.append(pred)
+        return np.array(predictions)
+
+    @staticmethod
     def return_accuracy(model, device, loader):
         with torch.no_grad():
             n_correct = 0

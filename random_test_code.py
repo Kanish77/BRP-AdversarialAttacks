@@ -59,15 +59,6 @@ class CustomDataset(Dataset):
 
 data = CustomDataset(dataset_name="CIFAR10", transform_to_apply=transforms.ToTensor(), train=False)
 print_once = True
-for x, y, idx in data:
-    # x is a tensor, y is an int (the class) (between 0 - 9), idx = index of the training variable
-    if print_once:
-        print(x)
-        print(y)
-        print(idx)
-        print_once = False
-    else:
-        break
 
 temp = np.array([[0], [1]]) == np.array([0, 1, 0])
 print(temp)
@@ -77,16 +68,6 @@ temp2 = np.array([0, 1, 0]) == np.array([[0], [1]])
 print(temp2)
 print(temp2.T * 0.4)
 
-
-mnist_test = CustomDataset(dataset_name="MNIST", transform_to_apply=transforms.ToTensor(), train=False)
-loader = torch.utils.data.DataLoader(mnist_test, batch_size=1, shuffle=True)
-
-iter = iter(loader)
-img, y, idx = iter.next()
-print(img.shape)
-img = img.reshape(-1, 28 * 28)
-print(img.shape)
-img = img.reshape(28, 28)
-print(img.shape)
-
-
+one = np.array([0, 1, 5])
+two = np.array([0, 5, 5])
+print(one != two)

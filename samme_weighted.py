@@ -15,6 +15,7 @@ from adversary_attack import AdversaryCode
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 EPSILON = 1e-10
 
+#this one uses hardcoded MLP and CNN classes, and not the WCNN i made later 
 
 class AdaBoost(object):
     """
