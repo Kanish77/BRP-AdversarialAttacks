@@ -14,3 +14,10 @@ data/MNIST/raw/t10k-images-idx3-ubyte
 data/MNIST/raw/t10k-labels-idx1-ubyte
 data/MNIST/raw/train-images-idx3-ubyte
 data/MNIST/raw/train-labels-idx1-ubyte
+data/FashionMNIST/processed/test.pt
+data/FashionMNIST/processed/training.pt
+data/FashionMNIST/raw/t10k-images-idx3-ubyte
+data/FashionMNIST/raw/t10k-labels-idx1-ubyte
+data/FashionMNIST/raw/train-images-idx3-ubyte
+data/FashionMNIST/raw/train-labels-idx1-ubyte
+saved_model/net_weighted_loss.pth

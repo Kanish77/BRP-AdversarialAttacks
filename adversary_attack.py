@@ -3,16 +3,13 @@ import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
 from advertorch.attacks import LinfBasicIterativeAttack, GradientSignAttack
-from advertorch.attacks import CarliniWagnerL2Attack, PGDAttack, LinfPGDAttack
+from advertorch.attacks import CarliniWagnerL2Attack, PGDAttack, LinfPGDAttack, MomentumIterativeAttack
 
 
 class AdversaryCode(object):
 
-    def __init__(self, args, defense_obj=None):
-        self.args = args
-        self.adversary = None
-        self.train_loader = None
-        self.test_loader = None
+    def __init__(self, radii, defense_obj):
+        self.radii = radii
         self.def_model = defense_obj
 
 
@@ -23,11 +20,12 @@ class AdversaryCode(object):
         if attack_name == "FGSM":
             print("Doing adversarial training with FGSM")
             adversary = GradientSignAttack(
-                self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="mean"), eps=0.078, targeted=False)
+                self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="mean"), eps=self.radii, targeted=False)
         elif attack_name == "BIM":
+            print("hey training with BIM")
             adversary = LinfBasicIterativeAttack(
-                self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="sum"), eps=0.25,
-                nb_iter=200, eps_iter=0.02, clip_min=0.0, clip_max=1.0, targeted=False)
+                self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="mean"), eps=self.radii,
+                nb_iter=20, eps_iter=0.03, clip_min=0.0, clip_max=1.0, targeted=False)
         elif attack_name == "CW":
             adversary = CarliniWagnerL2Attack(
                 self.def_model, num_classes=10, learning_rate=0.45, binary_search_steps=10,
@@ -36,26 +34,19 @@ class AdversaryCode(object):
             print("hey training with PGD")
             adversary = PGDAttack(
                 self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="mean"),
-                eps=0.156, nb_iter=20, eps_iter=0.03, clip_min=0.0, clip_max=1.0, targeted=False)
+                eps=self.radii, nb_iter=20, eps_iter=0.03, clip_min=0.0, clip_max=1.0, targeted=False)
         elif attack_name == "Lf-PGD":
+            print("hey training with lf-pgd")
             adversary = LinfPGDAttack(
-                self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="sum"), eps=0.15,
-                nb_iter=6, eps_iter=0.03, rand_init=True, clip_min=0.0, clip_max=1.0, targeted=False)
+                self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="mean"), eps=self.radii,
+                nb_iter=20, eps_iter=0.03, rand_init=True, clip_min=0.0, clip_max=1.0, targeted=False)
+        elif attack_name == "MIA":
+            print("hey training with MIA")
+            adversary = MomentumIterativeAttack(
+                self.def_model, loss_fn=nn.CrossEntropyLoss(reduction="mean"), eps=self.radii, nb_iter=20,
+                eps_iter=0.03, clip_min=0.0, clip_max=1.0, targeted=False)
         else:
             # Using clean data samples
             adversary = None
 
         return adversary
-
-    """
-    This method generates an adversarial example for adversarial training.
-    """
-    def generate_adversarial_example(self, adversary, image, label):
-        return adversary.perturb(image, label)
-
-
-    """
-    This method will attack a given model ie. used for white-box attack testing
-    """
-    def attack_model(self):
-        ...

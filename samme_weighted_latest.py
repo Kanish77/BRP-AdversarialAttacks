@@ -10,10 +10,10 @@ from torchvision import datasets, transforms
 from torch.utils.data import Dataset, DataLoader
 from CNN import ConvNet
 from MLP import MLP
-from WCNN import WCNN3, CNNBaseLearner
+from WCNN import WCNN2, WCNN3, WCNN4, WCCN5, CNNBaseLearner
 from MyDataset import CustomDataset
 from adversary_attack import AdversaryCode
-
+import time
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 EPSILON = 1e-10
 
@@ -30,8 +30,8 @@ class AdaBoost(object):
         to try
     """
 
-    def __init__(self, m, X, Y, training_data, base_learner, num_epochs, batch_size, nn_learning_rate,
-                 independent_variable="ALL", independent_variable_values=[]):
+    def __init__(self, m, X, Y, training_data, base_learner, num_epochs, batch_size, nn_learning_rate, activation_fn,
+                 learner_name, adv_train_algo, loss_fn, perturbation_radii):
         # Defining the number of learners
         self._number_learners = m
         # Defining the learning rate of the learners. Weight applied to each classifier at each boosting iteration.
@@ -55,27 +55,15 @@ class AdaBoost(object):
         self._nn_learning_rate = nn_learning_rate
         self._nn_num_epoch = num_epochs
         self._nn_batch_size = batch_size
+        self._learner_name = learner_name
 
         # --------------------------------------------------------------------------------------------------------
         # The following are variables related to performing mini-experiments (including the independent variables)
         # --------------------------------------------------------------------------------------------------------
-
-        # are we altering multiple independent variable at the same time (i.e testing correlations between variables)
-        self._multiple_independent_variable = False
-        # what current independent variable are we currently experimenting with. Default option of "ALL" means we are
-        # not altering any, and using best values found
-        self._chosen_independent_variable = independent_variable
-        # values for the independent variables we want to test
-        self._independent_variable_values = independent_variable_values
-        # Parameter that decides if we are doing SAMME or SAMME.R algorithm
-        self._algorithm = "SAMME"
-        # Following are the independent variables, names self-explanatory
-        self._nn_shape = []
-        self._nn_training_loss_function = "cross-entropy-loss"
-        self._nn_activation_function = "ReLU"
-        self._nn_perturbation_radius = 8 / 256
-        self._nn_adversary_attack_algo = "FGSM"
-        self._nn_optimiser = "SGD"
+        self._nn_training_loss_function = loss_fn
+        self._nn_activation_function = activation_fn
+        self._nn_perturbation_radius = perturbation_radii
+        self._nn_adversary_attack_algo = adv_train_algo
 
     """
     @:param training_data: a pytorch dataset object
@@ -125,7 +113,7 @@ class AdaBoost(object):
                              "Iterations stopped. Try lowering the learning rate.")
         # normalise
         w_new = w_new / w_sum
-        return torch.tensor(w_new)
+        return torch.tensor(w_new, dtype=torch.float)
 
     def update_weights(self, train_loader, incorrect, alpha, w_prev, batch_size):
         w_new = torch.zeros(len(w_prev))
@@ -145,6 +133,18 @@ class AdaBoost(object):
         # normalise
         w_new = w_new / w_sum
         return w_new
+
+    def get_learner_from_name(self, activation_function):
+        if self._learner_name == "WCNN2":
+            return WCNN2().to(device)
+        if self._learner_name == "WCNN3":
+            return WCNN3(activation_function).to(device)
+        elif self._learner_name == "WCNN4":
+            return WCNN4().to(device)
+        elif self._learner_name == "WCNN5":
+            return WCCN5().to(device)
+        else:
+            raise ValueError("give valid name for learner")
 
     def fit_ensemble(self, adversarial_training, random_sampling=False):
         # We need to first do some initializations for the first ensemble.
@@ -175,21 +175,33 @@ class AdaBoost(object):
 
             # Train "weak" learner based on sample training data
             print("STARTED TRAINING LEARNER:", m)
-            weak_learner = WCNN3().to(device)  # MLP(784, 10, 10, device).to(device)
+            weak_learner = self.get_learner_from_name(self._nn_activation_function)
 
             # if we are doing adversarial training, we want to make the adversarial generation algo object
             if adversarial_training:
-                adversary_algo = AdversaryCode("", weak_learner).get_adversary_method(self._nn_adversary_attack_algo)
-                weak_learner = CNNBaseLearner.perform_training(weak_learner, device, train_loader, self._nn_num_epoch,
-                                                               self._nn_learning_rate, w, adversarial_training=True,
-                                                               adversary_algo=adversary_algo)
+                # print("now doing adversarial training")
+                adversary_algo = AdversaryCode(self._nn_perturbation_radius, weak_learner).get_adversary_method(self._nn_adversary_attack_algo)
+                if self._nn_training_loss_function == "TRADES":
+                    print("hey doing trades")
+                    weak_learner = CNNBaseLearner.perform_trades_training(weak_learner, device, train_loader,
+                                                                          self._nn_num_epoch, self._nn_learning_rate, w,
+                                                                          adversary_algo)
+                else:
+                    weak_learner = CNNBaseLearner.perform_training(weak_learner, device, train_loader,
+                                                                   self._nn_num_epoch,
+                                                                   self._nn_learning_rate, w, adversarial_training=True,
+                                                                   loss_fn=self._nn_training_loss_function,
+                                                                   adversary_algo=adversary_algo,
+                                                                   random_sampling=random_sampling)
                 # Compute error of this weak learner based on the adversarial attacks being done to it
                 incorrect = CNNBaseLearner.compute_incorrect_array_adversary_training(weak_learner, device,
                                                                                       train_loader,
                                                                                       adversary_algo).to("cpu").numpy()
             else:
                 weak_learner = CNNBaseLearner.perform_training(weak_learner, device, train_loader, self._nn_num_epoch,
-                                                               self._nn_learning_rate, w, adversarial_training=False)
+                                                               self._nn_learning_rate, w, adversarial_training=False,
+                                                               loss_fn=self._nn_training_loss_function,
+                                                               random_sampling=random_sampling)
                 # Compute error of this weak learner
                 incorrect = CNNBaseLearner.compute_incorrect_array(weak_learner, device, train_loader).to("cpu").numpy()
 
@@ -220,12 +232,14 @@ class AdaBoost(object):
                 # break
 
             # Update data distribution
-            print("UPDATING WEIGHTS")
+            # print("UPDATING WEIGHTS")
             if random_sampling:
-                w = self.update_weights_random_sampled(train_loader, incorrect, alphaM, w, self._nn_batch_size).to(device)
+                w = self.update_weights_random_sampled(train_loader, incorrect, alphaM, w, self._nn_batch_size).to(
+                    device)
             else:
+                # print("using normal method, no random sampling")
                 w = self.update_weights(train_loader, incorrect, alphaM, w, self._nn_batch_size).to(device)
-            print("DONE UPDATING")
+            # print("DONE UPDATING")
             self._learner_array.append(weak_learner)
             self._learner_errors[m] = learner_err
             self._learner_weights[m] = alphaM
@@ -291,42 +305,141 @@ class AdaBoost(object):
         # plt.show()
         return final_predictions
 
-
-# # Trying out adaboost for CNN
-# transform = transforms.Compose(
-#     [transforms.ToTensor(),
-#      transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-# cifar10_train = CustomDataset(dataset_name="CIFAR10", transform_to_apply=transform, train=True)
-# cifar10_test = CustomDataset(dataset_name="CIFAR10", transform_to_apply=transform, train=False)
-# adaboost_cnn = AdaBoost(2, [], [], cifar10_train, None, 1, 250, 0.001)
-# learner_err, learner_weight = adaboost_cnn.fit_ensemble()
-# print("learner errors", learner_err)
-# print("learner weights", learner_weight)
-# adaboost_cnn.ensembled_prediction(cifar10_test)
-
-# Trying out adaboost for mnist (mlp)
 mnist_train = CustomDataset(dataset_name="MNIST", transform_to_apply=transforms.ToTensor(), train=True)
 mnist_test = CustomDataset(dataset_name="MNIST", transform_to_apply=transforms.ToTensor(), train=False)
+# # Settings for perturbation radii tests
+# settings = []
 
-adaboost_mlp = AdaBoost(2, [], [], mnist_train, None, 3, 100, 0.002)
-learner_error, learner_weight, target = adaboost_mlp.fit_ensemble(adversarial_training=True, random_sampling=True)
-np.set_printoptions(precision=4)
-print("learner errors", learner_error)
-print("learner weights", learner_weight)
-adaboost_mlp.ensembled_prediction(mnist_test)
+# # Settings for activation function tests
+# settings = [("ReLU", 7), ("ReLU", 1), ("HardTanH", 7), ("HardTanH", 1), ("Leaky_ReLU", 7), ("Leaky_ReLU", 1),
+#             ("ELU", 7), ("ELU", 1), ("GeLU", 7), ("GeLU", 1)]
 
-adversary_attack_PGD = PGDAttack(
-    target, loss_fn=nn.CrossEntropyLoss(reduction="mean"),
-    eps=0.156, nb_iter=20, eps_iter=0.03, clip_min=0.0, clip_max=1.0, targeted=False)
-adversary_attack_FGSM = GradientSignAttack(
-    target, loss_fn=nn.CrossEntropyLoss(reduction="mean"), eps=0.156, targeted=False)
-print("fgsm attack now")
-adaboost_mlp.test_adversary_robustness(mnist_test, adversary_attack_FGSM, target)
-print("pgd attack now")
-adaboost_mlp.test_adversary_robustness(mnist_test, adversary_attack_PGD, target)
+# # Settings for model size tests
+# settings = [("WCNN3", True), ("WCNN3", False), ("WCNN4", True), ("WCNN4", False), ("WCNN5", True), ("WCNN5", False)]
 
-# for i in range(3):
-#     plt.subplot(2, 3, i + 1)
-#     plt.imshow(mnist_test[i][0][0], cmap='gray')
-#     plt.title("real images")
-# plt.show()
+# # Settings for adversarial algorithm tests
+# settings = [("FGSM", 1), ("FGSM", 7), ("BIM", 1), ("BIM", 7), ("PGD", 1), ("PGD", 7), ("Lf-PGD", 1), ("Lf-PGD", 7)]
+
+# # Settings for loss function tests
+# settings = [("KL", 7), ("KL", 1), ("CE", 7), ("CE", 1), ("TRADES", 7), ("TRADES", 1)]
+
+# For num_learners
+# settings = {
+#     "num_learners":   [1, 10],
+#     "perturb_radii":  [0.3, 0.3],
+#     "adversary_algo": ["PGD", "PGD"],
+#     "model_size":     ["WCNN3", "WCNN3"],
+#     "activation_fn":  ["ReLU", "ReLU"],
+#     "loss_fn":        ["CE", "CE"],
+# }
+
+# # For perturbation_radii
+# settings = {
+#     "num_learners":   [7, 7],
+#     "perturb_radii":  [0.03137, 0.30],
+#     "adversary_algo": ["PGD", "PGD"],
+#     "model_size":     ["WCNN3", "WCNN3"],
+#     "activation_fn":  ["ReLU", "ReLU"],
+#     "loss_fn":        ["CE", "CE"],
+# }
+#
+# # For adversary_algo
+# settings = {
+#     "num_learners":   [7, 7],
+#     "perturb_radii":  [0.3, 0.3],
+#     "adversary_algo": ["FGSM", "PGD"],
+#     "model_size":     ["WCNN3", "WCNN3"],
+#     "activation_fn":  ["ReLU", "ReLU"],
+#     "loss_fn":        ["CE", "CE"],
+# }
+#
+# # For model type
+# settings = {
+#     "num_learners":   [1, 1, 1, 1, 1, 1],
+#     "perturb_radii":  [0.3, 0.3, 0.3, 0.3, 0.3, 0.3],
+#     "adversary_algo": ["PGD", "PGD", "PGD", "PGD", "PGD", "PGD"],
+#     "model_size":     ["WCNN4", "WCNN4", "WCNN4", "WCNN5", "WCNN5", "WCNN5"],
+#     "activation_fn":  ["ReLU", "ReLU", "ReLU", "ReLU", "ReLU", "ReLU"],
+#     "loss_fn":        ["CE", "CE", "CE", "CE", "CE", "CE"],
+# }
+#
+# # For activation function
+# settings = {
+#     "num_learners":   [7, 7],
+#     "perturb_radii":  [0.3, 0.3],
+#     "adversary_algo": ["PGD", "PGD"],
+#     "model_size":     ["WCNN3", "WCNN3"],
+#     "activation_fn":  ["ELU", "Leaky_ReLU"],
+#     "loss_fn":        ["CE", "CE"],
+# }
+#
+# # For loss function
+# settings = {
+#     "num_learners":   [7, 7, 7],
+#     "perturb_radii":  [0.3, 0.3, 0.3],
+#     "adversary_algo": ["PGD", "PGD", "PGD"],
+#     "model_size":     ["WCNN3", "WCNN3", "WCNN3"],
+#     "activation_fn":  ["ReLU", "ReLU", "ReLU"],
+#     "loss_fn":        ["CE", "KL", "TRADES"],
+# }
+
+# Random experiments
+# settings = {
+#     "num_learners":   [1, 1, 1, 1, 7],
+#     "perturb_radii":  [0.3, 0.3, 0.3, 0.3, 0.3],
+#     "adversary_algo": ["MIA", "BIM", "BIM", "PGD", "PGD"],
+#     "model_size":     ["WCNN3", "WCNN3", "WCNN3", "WCNN3", "WCNN3"],
+#     "activation_fn":  ["ReLU", "ReLU", "ReLU", "ReLU", "ReLU"],
+#     "loss_fn":        ["CE", "CE", "CE", "KL", "KL"],
+# }
+
+# Single experiments
+settings = {
+    "num_learners":   [1, 4, 7, 1, 1, 1, 1, 1, 1],
+    "perturb_radii":  [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3],
+    "adversary_algo": ["PGD", "PGD", "PGD", "PGD", "PGD", "PGD", "PGD", "PGD", "PGD"],
+    "model_size":     ["WCNN3", "WCNN3", "WCNN3", "WCNN2", "WCNN4", "WCNN5", "WCNN3", "WCNN3", "WCNN3"],
+    "activation_fn":  ["ReLU", "ReLU", "ReLU", "ReLU", "ReLU", "ReLU", "ReLU", "ReLU", "ReLU"],
+    "loss_fn":        ["CE", "CE", "CE", "CE", "CE", "CE", "CE", "KL", "TRADES"],
+}
+
+num_tests = len(settings["num_learners"])
+for i in range(num_tests):
+    num_learner = settings["num_learners"][i]
+    perturb_radii = settings["perturb_radii"][i]
+    adversary_algo = settings["adversary_algo"][i]
+    model_size = settings["model_size"][i]
+    activation_fn = settings["activation_fn"][i]
+    loss_fn = settings["loss_fn"][i]
+    print("Data for test with variable values: m = ", num_learner, ", e = ", perturb_radii, ", train adv_algo = ",
+          adversary_algo, ", CNN type = ", model_size, ", activation_fn = ", activation_fn, ", loss_fn = ", loss_fn)
+    print("------------------------------------------------------------------------------------------------------------------------------------------")
+    adaboost_mlp = AdaBoost(num_learner, [], [], mnist_train, None, 3, 100, 0.002,
+                            activation_fn=activation_fn, learner_name=model_size, adv_train_algo=adversary_algo,
+                            loss_fn=loss_fn,  perturbation_radii=perturb_radii)
+    start_time = time.time()
+    learner_error, learner_weight, target = adaboost_mlp.fit_ensemble(adversarial_training=True,
+                                                                      random_sampling=False)
+    np.set_printoptions(precision=4)
+    end_time = time.time()
+    print("it took ", end_time-start_time, " seconds to train")
+    # print("learner errors", learner_error)
+    # print("learner weights", learner_weight)
+    # adaboost_mlp.ensembled_prediction(mnist_test)
+
+    # adversary_attack_PGD1 = PGDAttack(
+    #     target, loss_fn=nn.CrossEntropyLoss(reduction="mean"),
+    #     eps=0.15, nb_iter=20, eps_iter=0.03, clip_min=0.0, clip_max=1.0, targeted=False)
+    # adversary_attack_PGD2 = PGDAttack(
+    #     target, loss_fn=nn.CrossEntropyLoss(reduction="mean"),
+    #     eps=0.30, nb_iter=20, eps_iter=0.03, clip_min=0.0, clip_max=1.0, targeted=False)
+    # adversary_attack_FGSM = GradientSignAttack(
+    #     target, loss_fn=nn.CrossEntropyLoss(reduction="mean"), eps=0.156, targeted=False)
+
+    # print("pgd attack1 now")
+    # adaboost_mlp.test_adversary_robustness(mnist_test, adversary_attack_PGD1, target)
+    # print("pgd attack2 now")
+    # adaboost_mlp.test_adversary_robustness(mnist_test, adversary_attack_PGD2, target)
+    # print("fgsm attack now")
+    # adaboost_mlp.test_adversary_robustness(mnist_test, adversary_attack_FGSM, target)
+    # print("--------------------------")
